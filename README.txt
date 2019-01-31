@@ -1,4 +1,4 @@
-Imagen Mod v1.0 PRERELEASE
+Imagen Mod v1.1 PRERELEASE
 By Leslie E. Krause
 
 Imagen is an image rendering library for Minetest formspecs. The API supports drawing

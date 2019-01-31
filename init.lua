@@ -1,5 +1,5 @@
 --------------------------------------------------------
--- Minetest :: Imagen Mod PRERELEASE v1.1 (imagen)
+-- Minetest :: Imagen Mod v1.1 PRERELEASE (imagen)
 --
 -- See README.txt for licensing and other information.
 -- Copyright (c) 2019, Leslie Ellen Krause
@@ -207,6 +207,58 @@ imagen.rasterize = function ( image, depth, gamma )
         return { map = map, depth = depth, iy_max = iy_max, ix_max = ix_max, width = image.size_x / 50, height = image.size_y / 48 }
 end
 
+imagen.rasterize_pixmap = function ( image, gamma )
+	local map = { }
+	local data = image.data
+	local iy_max = 19
+	local ix_max = 4
+
+	if not depth then
+		depth = "drawing"
+	end
+	if not gamma then
+		gamma = { 48, 64, 128 }
+	end
+
+        for y = 1, image.size_y do
+		local iy = ( y - 1 ) % iy_max + 1
+
+		if not map[ iy ] then map[ iy ] = { } end
+
+		local y_map = map[ iy ]
+                for x = 1, image.size_x do
+			local ix = ( x - 1 ) % ix_max + 1
+			local r = data[ y ][ x ].r
+			local g = data[ y ][ x ].g
+			local b = data[ y ][ x ].b
+			local k = data[ y ][ x ].k
+
+			if not y_map[ ix ] then
+				y_map[ ix ] = { "", "", "", "" }
+			end
+
+			local bitR = r < 64 and " " or "."
+			local bitG = g < 64 and " " or "."
+			local bitB = b < 64 and " " or "."
+			local bitK = k < 32 and "." or k < 64 and " " or k < 128 and "." or " "
+			y_map[ ix ][ 1 ] = y_map[ ix ][ 1 ] .. bitR
+			y_map[ ix ][ 2 ] = y_map[ ix ][ 2 ] .. bitG
+			y_map[ ix ][ 3 ] = y_map[ ix ][ 3 ] .. bitB
+			y_map[ ix ][ 4 ] = y_map[ ix ][ 4 ] .. bitK
+		end
+		for ix = 1, ix_max do
+			y_map[ ix ][ 1 ] = y_map[ ix ][ 1 ] .. "\n"
+			y_map[ ix ][ 2 ] = y_map[ ix ][ 2 ] .. "\n"
+			y_map[ ix ][ 3 ] = y_map[ ix ][ 3 ] .. "\n"
+			y_map[ ix ][ 4 ] = y_map[ ix ][ 4 ] .. "\n"
+		end
+	end
+
+	-- TODO: support bitmaps smaller than ix_max x iy_max dimensions!
+
+        return { map = map, depth = "artwork", iy_max = iy_max, ix_max = ix_max, width = image.size_x / 50, height = image.size_y / 48 }
+end
+
 --------------------------------------
 -- imagen.render_canvas( )
 --------------------------------------
@@ -223,15 +275,14 @@ imagen.render_canvas = function ( canvas, horz, vert, palette )
 
 	if not palette then
 		palette = ( {
-			drawing = { a = "#FFFFFFFF" },
-			picture = { a = "#000000AA", b = "#00000022", x = "#FFFFFFFF" },
-			graphic = { a = "#FFFFFFFF", b = "#00000044", x = "#444444FF" }
+			drawing = { m = "#FFFFFFFF" },
+			picture = { m = "#000000AA", k = "#00000022", x = "#FFFFFFFF" },
+			graphic = { m = "#FFFFFFFF", k = "#00000044", x = "#444444FF" },
+			artwork = { r = "#FFAAAA77", g = "#AAFFAA77", b = "#AAAAFF77", k = "#00000088", x = "#444444FF" },
 		} )[ depth ]
 	end
 
-	if depth == "picture" then
-		formspec = sprintf( "box[%0.2f,%0.2f;%0.2f,%0.2f;%s]", horz, vert, width, height, palette.x )
-	elseif depth == "graphic" then
+	if depth ~= "drawing" then
 		formspec = sprintf( "box[%0.2f,%0.2f;%0.2f,%0.2f;%s]", horz, vert, width, height, palette.x )
 	end
 
@@ -246,98 +297,23 @@ imagen.render_canvas = function ( canvas, horz, vert, palette )
 
 			if depth == "picture" then
 		                formspec = formspec
-					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.a, y_map[ x ][ 1 ] ) )
-					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.b, y_map[ x ][ 2 ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.m, y_map[ x ][ 1 ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.k, y_map[ x ][ 2 ] ) )
 			elseif depth == "graphic" then
 		                formspec = formspec
-					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.a, y_map[ x ][ 1 ] ) )
-					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.b, y_map[ x ][ 2 ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.m, y_map[ x ][ 1 ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.k, y_map[ x ][ 2 ] ) )
+			elseif depth == "artwork" then
+		                formspec = formspec
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.r, y_map[ x ][ 1 ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.g, y_map[ x ][ 2 ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.b, y_map[ x ][ 3 ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.k, y_map[ x ][ 4 ] ) )
 			else
 		                formspec = formspec
-					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.a, y_map[ x ] ) )
+					.. sprintf( "label[%0.2f,%0.2f;%s]", h, v, minetest.colorize( palette.m, y_map[ x ] ) )
 			end
 		end
 	end
 	return formspec
 end
-
---------------------------------------
-
-local canvas_cache = { }
-local S1,S1_=Stopwatch("load_image","s")
-local S2,S2_=Stopwatch("rasterize","s")
-local S3,S3_=Stopwatch("render_canvas","s")
-
-local function show_image( name, param )
-	if param == "" then
-		canvas_cache = { }
-		print( "canvas cache cleared" )
-		return
-	end
-
---	local filename = minetest.get_modpath( "imagen" ) .. "/images/" .. param .. ".ppm"
-	local filename = "/var/www/html/uploads/" .. param .. ".ppm"
-	if not canvas_cache[ filename ] then
-		S1()
-		local image = imagen.load_image( filename )
-		S1_(true)
-
-		if not image then
-        		print( "Error reading " .. filename )
-			return
-		end
-
-		S2()
-		canvas_cache[ filename ] = imagen.rasterize( image, "picture" )
-		S2_(true)
-	end
-
-	S3()
-	local bpp = { drawing = 1, picture = 2, graphic = 2 }
-	local canvas = canvas_cache[ filename ]
-
-	local t1 = minetest.get_server_uptime( )
-	local output_text = imagen.render_canvas( canvas, 0, 0 )
-	local t2 = minetest.get_server_uptime( )
-
-        local formspec = "size[10,8]"
-                .. default.gui_bg
-                .. default.gui_bg_img
-
-		.. output_text
-
-		.. string.format( "label[0.1,6.0;Filename = %s]", filename )
-		.. string.format( "label[0.1,6.5;Canvas Area = %d x %d (%d bpp)]", canvas.width, canvas.height, bpp[ canvas.depth ] )
-		.. string.format( "label[0.1,7.0;Output Size = %d bytes]", #output_text )
-		.. string.format( "label[0.1,7.5;Render Time = %d ms]", t2 - t1 )
-
-	minetest.create_form( nil, name, formspec, function ( ) end )
-	S3_(true)
-end
-
-minetest.register_chatcommand( "img", {
-        description = "Show a dynamically generated image given an input file.",
-        func = show_image
-})
-
-minetest.register_chatcommand( "draw", {
-        description = "Show a dynamically generated image with vector graphics.",
-        func = function ( name, param )
-		local image = imagen.init_image( 140, 140, { r = 0, g = 0, b = 0 } )
-
-		imagen.draw_circle_solid( image, 45, 45, 40, { r = 255, g = 255, b = 255 } )
-		imagen.draw_circle_outline( image, 80, 80, 50, { r = 255, g = 255, b = 255 } )
-		imagen.draw_line( image, 60, 40, 135, 135, { r = 255, g = 255, b = 255 } )
-
-		local output_text = imagen.render_canvas( imagen.rasterize( image, "drawing" ), 0.5, 0.5, { a = "#FFFF00FF" } )
-
-	        local formspec = "size[4,4]"
-        	        .. default.gui_bg
-                	.. default.gui_bg_img
-			.. output_text
-
-			.. string.format( "label[0.1,7.0;Output Size = %d bytes]", #output_text )
-
-		minetest.create_form( nil, name, formspec, function ( ) end )
-	end
-})
